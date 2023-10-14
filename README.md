@@ -1,4 +1,3 @@
-# HMS API Gateway
 
 
 # Using Celery
