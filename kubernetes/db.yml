@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: api-gateway-db-volume
+  labels:
+    app: api-gateway-db-volume
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 200Mi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: "/mnt/data"
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app: api-gateway-db-claim
+  name: api-gateway-db-claim
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 200Mi
+
+
+---
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: api-gateway-db
+  name: api-gateway-db-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway-db
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: api-gateway-db
+    spec:
+      containers:
+        - envFrom:
+            - secretRef:
+                name: hms-secret
+          image: postgres:14
+          name: api-gateway-db
+          ports:
+            - containerPort: 5432
+          resources: {}
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data/
+              name: api-gateway-db-volume
+      restartPolicy: Always
+      volumes:
+        - name: api-gateway-db-volume
+          persistentVolumeClaim:
+            claimName: api-gateway-db-claim
+
+
+---
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: api-gateway-db
+  name: api-gateway-db-service
+spec:
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+  selector:
+    app: api-gateway-db

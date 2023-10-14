@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: api-gateway-websocket
+  name: api-gateway-websocket
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway-websocket
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: api-gateway-websocket
+    spec:
+      containers:
+        - command:
+            - daphne
+            - -b
+            - 0.0.0.0
+            - -p
+            - "8003"
+            - hms_api_gateway.asgi:application
+          image: registry.digitalocean.com/heckerbella/api_gateway_websocket:latest
+          imagePullPolicy: Always
+          name: api-gateway-websocket
+          envFrom:
+            - configMapRef:
+                name: env
+            - secretRef:
+                name: hms-secret
+          ports:
+            - containerPort: 8003
+          resources: {}
+          volumeMounts:
+            - mountPath: /code
+              name: api-gateway-websocket-claim0
+      restartPolicy: Always
+      volumes:
+        - name: api-gateway-websocket-claim0
+          persistentVolumeClaim:
+            claimName: api-gateway-websocket-claim0
+
+
+---
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: api-gateway-websocket
+  name: api_gateway_websocket
+spec:
+  ports:
+    - name: "8003"
+      port: 8003
+      targetPort: 8003
+    - name: 8003-tcp
+      port: 8003
+      targetPort: 8003
+  selector:
+    app: api-gateway-websocket
+status:
+  loadBalancer: {}

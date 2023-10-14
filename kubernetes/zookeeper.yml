@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: zookeeper-deployment
+  name: zookeeper-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: zookeeper-deployment
+  template:
+    metadata:
+      labels:
+        name: zookeeper-deployment
+    spec:
+      containers:
+        - name: zookeeper-deployment
+          image: bitnami/zookeeper:latest
+          # image: confluentinc/cp-zookeeper:latest
+          ports:
+          - containerPort: 2181
+          env:
+            - name: ALLOW_ANONYMOUS_LOGIN
+              value: "yes"
+
+--- 
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: zookeeper-service
+  name: zookeeper-service
+spec:
+  ports:
+    - name: zookeeper
+      port: 2181
+      protocol: TCP
+  selector:
+    app: zookeeper-deployment

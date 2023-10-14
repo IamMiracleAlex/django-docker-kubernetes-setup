@@ -1,0 +1,69 @@
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: api-gateway-ingress
+#   annotations:
+#     kubernetes.io/ingress.class: "nginx"
+#     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+#     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+#     nginx.ingress.kubernetes.io/proxy-connect-timeout: "3600"
+#     nginx.ingress.kubernetes.io/rewrite-target: /
+#     # nginx.ingress.kubernetes.io/secure-backends: "true"
+#     # nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+#     nginx.ingress.kubernetes.io/configuration-snippets: |
+#         proxy_set_header Upgrade "websocket";
+#         proxy_http_version 1.1;
+#         proxy_set_header Connection "Upgrade";
+# spec:
+#   ingressClassName: nginx
+#   # tls:
+#   #   - hosts:
+#   #       - "api.hms.heckerbella.com"
+#   #   - secretName: api-gateway-ssl
+#   rules:
+#     - host: api.hms.heckerbella.com
+#       http:
+#         paths:
+#           - path: /
+#             backend:
+#               serviceName: api-gateway-service
+#               servicePort: 8000
+#           # - path: /ws/
+#           #   backend:
+#           #     serviceName: api-gateway-websocket
+#           #     servicePort: 8003
+#           - path: /flower/
+#             backend:
+#               serviceName: api-gateway-flower-service
+#               servicePort: 5555
+
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hms-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    # kubernetes.io/ingress.global-static-ip-name: ingress-static-ip
+
+spec:
+  rules:
+  - host: hms.heckerbella.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway-service
+            port:
+              number: 8000
+      - path: /flower
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway-flower-service
+            port:
+              number: 5555
+  ingressClassName: nginx

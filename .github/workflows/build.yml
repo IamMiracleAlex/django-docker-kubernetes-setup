@@ -1,0 +1,74 @@
+name: API GATEWAY BUILD CI
+
+on:
+
+  push:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [3.8]
+
+    env:
+      CLUSTER_NAME: hms
+
+    steps:
+    - name: Check out repo
+      uses: actions/checkout@v3
+
+    - name: Build and Push Images
+      run: |
+        docker login -u ${{ secrets.REGISTRY_TOKEN }} -p ${{ secrets.REGISTRY_TOKEN }} registry.digitalocean.com
+        docker-compose build 
+        docker-compose push 
+
+    - name: Install Doctl
+      uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ secrets.REGISTRY_TOKEN }}
+
+    - name: Setup Kubernetes
+      run: |
+        cat << EOF >> .env.prod
+        DEBUG=1
+        ENVIRONMENT=${{ secrets.ENVIRONMENT }}
+        SECRET_KEY=${{ secrets.SECRET_KEY }}
+        ENGINE=${{ secrets.ENGINE }}
+        DB_NAME=${{ secrets.DB_NAME }}
+        POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+        POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+        DB_PORT=${{ secrets.DB_PORT }}
+        EMAIL_BACKEND=${{ secrets.EMAIL_BACKEND }}
+        EMAIL_HOST=${{ secrets.EMAIL_HOST }}
+        EMAIL_HOST_USER=${{ secrets.EMAIL_HOST_USER }}
+        EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
+        EMAIL_PORT=${{ secrets.EMAIL_PORT }}
+        EMAIL_USE_TLS=${{ secrets.EMAIL_USE_TLS }}
+        DEFAULT_FROM_EMAIL=${{ secrets.DEFAULT_FROM_EMAIL }}
+        EOF
+        doctl kubernetes cluster kubeconfig save --expiry-seconds 600 ${{ env.CLUSTER_NAME }}
+        kubectl delete secret hms-secret
+        kubectl create secret generic hms-secret --from-env-file=.env.prod
+        kubectl apply -f kubernetes/configmap.yml
+
+    - name: Deploy to Kubernetes
+      run: |
+        kubectl rollout restart deployment/api-gateway-deployment
+        kubectl rollout restart deployment/api-gateway-celery
+        kubectl rollout restart deployment/api-gateway-celery-beat
+
+    - name: Confirm Deployment
+      run: |
+        kubectl rollout status deployment/api-gateway-deployment
+        kubectl rollout status deployment/api-gateway-celery
+        kubectl rollout status deployment/api-gateway-celery-beat
+
+    - name: Create Migrations and Migrate
+      run: |
+        export POD_NAME=$(kubectl get pod -l app=api-gateway -o jsonpath="{.items[0].metadata.name}")
+        kubectl exec -it $POD_NAME -- bash deployments/migrate.sh    

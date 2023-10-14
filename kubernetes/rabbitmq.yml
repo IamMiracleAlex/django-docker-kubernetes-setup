@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: api-gateway-rabbitmq
+  name: api-gateway-rabbitmq-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway-rabbitmq
+  template:
+    metadata:
+      labels:
+        app: api-gateway-rabbitmq
+    spec:
+      containers:
+        - image: rabbitmq:3
+          name: api-gateway-rabbitmq
+          ports:
+            - containerPort: 5672
+    
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: api-gateway-rabbitmq-service
+  name: api-gateway-rabbitmq-service
+spec:
+  ports:
+    - name: "5672"
+      port: 5672
+      targetPort: 5672
+  selector:
+    app: api-gateway-rabbitmq
+status:
+  loadBalancer: {}

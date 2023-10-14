@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: api-gateway-flower
+  name: api-gateway-flower-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway-flower
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: api-gateway-flower
+    spec:
+      containers:
+        - command:
+            - celery
+            - -A
+            - hms_api_gateway
+            - flower
+            - --ports=5555
+          image: registry.digitalocean.com/heckerbella/api_gateway_flower:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: env
+            - secretRef:
+                name: hms-secret
+          name: api-gateway-flower
+          ports:
+            - containerPort: 5555
+      imagePullSecrets:
+        - name: heckerbella  
+
+
+---
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: api-gateway-flower
+  name: api-gateway-flower-service
+spec:
+  ports:
+    - name: "5555"
+      port: 5555
+      targetPort: 5555
+  selector:
+    app: api-gateway-flower
+status:
+  loadBalancer: {}

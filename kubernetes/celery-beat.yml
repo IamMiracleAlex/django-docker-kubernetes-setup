@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: api-gateway-celery-beat
+  name: api-gateway-celery-beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway-celery-beat
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: api-gateway-celery-beat
+    spec:
+      containers:
+        - args:
+            - celery
+            - -A
+            - hms_api_gateway
+            - beat
+            - -l
+            - info
+          image: registry.digitalocean.com/heckerbella/api_gateway_celery_beat:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: env
+            - secretRef:
+                name: hms-secret
+          name: api-gateway-celery-beat
+      imagePullSecrets:
+        - name: heckerbella
+
+
+          # - tail
+          # - "-f"
+          # - /dev/null

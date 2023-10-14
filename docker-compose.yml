@@ -1,0 +1,132 @@
+version: "3.0"
+services:
+
+  api_gateway_web:
+    image: registry.digitalocean.com/heckerbella/api_gateway_web:latest
+    build: ./
+    command: sh -c "python3 manage.py makemigrations &&
+      python3 manage.py migrate_schemas &&
+      python3 manage.py migrate_schemas --shared &&
+      gunicorn hms_api_gateway.wsgi:application --bind 0.0.0.0:8000"
+    ports:
+    - "8000:8000"
+    expose:
+       - 8000
+    restart: "always"
+    depends_on:
+      - api_gateway_db
+
+  api_gateway_redis:
+    image: redis:latest
+    container_name: api_gateway_redis
+    ports:
+      - "6378:6379"
+
+  api_gateway_db:
+    restart: always
+    image: postgres
+    volumes:
+      - api_gateway_db_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5434:5432"
+    expose:
+      - 5432
+
+  # nginx:
+  #   build: ./nginx
+  #   image: registry.digitalocean.com/heckerbella/nginx:latest
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - static:/etc/nginx/home/code/static/
+  #   depends_on: 
+  #     - api_gateway_web
+  #   restart: always
+
+  api_gateway_celery:
+    restart: always
+    image: registry.digitalocean.com/heckerbella/api_gateway_celery:latest
+    build:
+      context: .
+    command: celery -A hms_api_gateway worker -l info
+    volumes:
+      - .:/code
+    container_name: api_gateway_celery
+    depends_on:
+      - api_gateway_db
+      - api_gateway_web
+      - api_gateway_redis
+
+  api_gateway_celery_beat:
+    restart: always
+    image: registry.digitalocean.com/heckerbella/api_gateway_celery_beat:latest
+    build:
+      context: .
+    command: celery -A hms_api_gateway beat -l info
+    container_name: api_gateway_celery_beat
+    volumes:
+      - .:/code
+    depends_on:
+      - api_gateway_db
+      - api_gateway_web
+      - api_gateway_redis
+
+  api_gateway_flower:
+    image: registry.digitalocean.com/heckerbella/api_gateway_flower:latest
+    build:
+      context: .
+    command: celery -A hms_api_gateway flower --ports=5557
+    container_name: api_gateway_flower
+    ports:
+      - 5557:55557
+    volumes:
+      - .:/code
+    depends_on:
+      - api_gateway_db
+      - api_gateway_web
+      - api_gateway_redis
+      - api_gateway_celery
+      - api_gateway_celery_beat
+
+  # api_gateway_websocket:
+  #   image: registry.digitalocean.com/heckerbella/api_gateway_websocket:latest
+  #   build:
+  #     context: .
+  #   command: daphne -b 0.0.0.0 -p 8003 hms_api_gateway.asgi:application
+  #   volumes:
+  #     - .:/code
+  #   ports:
+  #     - "8003:8003"
+  #   expose:
+  #     - 8003
+  #   links:
+  #     - api_gateway_redis
+
+  # zookeeper:
+  #   image: 'bitnami/zookeeper:latest'
+  #   ports:
+  #     - '2181:2181'
+  #   environment:
+  #     - ALLOW_ANONYMOUS_LOGIN=yes
+
+  # kafka:
+  #   image: 'bitnami/kafka:latest'
+  #   ports:
+  #     - '9092:9092'
+  #   environment:
+  #     - KAFKA_BROKER_ID=1
+  #     - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+  #     - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092
+  #     - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+  #     - ALLOW_PLAINTEXT_LISTENER=yes
+  #   depends_on:
+  #     - zookeeper
+      
+volumes:
+    api_gateway_db_data:
+    static:
